@@ -1,0 +1,166 @@
+{
+  "name": "UPSC/BPSC Mains Answer Evaluator",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true,
+          "imageSize": "large"
+        }
+      },
+      "id": "de0e95fa-ac9f-4476-ae4e-3fa48ea5bb27",
+      "name": "Student Sends Answer Sheet",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-photo-and-question",
+              "leftValue": "={{ !!($json.message && $json.message.photo && $json.message.photo.length > 0 && $binary && $binary.data && String($json.message.caption || \"\").trim().length > 0) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c6463b68-42df-4570-bbd9-9d682d923eaf",
+      "name": "Photo And Question Present?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "text": "=You are a strict but supportive UPSC/BPSC Mains examiner. The attached image is a student's handwritten answer.\n\nQUESTION: {{ $('Student Sends Answer Sheet').item.json.message.caption }}\n\nDo silently: (1) read the handwriting, (2) analyse Structure (intro/body/conclusion), Relevance to the question, Missing elements (articles, judgments, data, diagrams), Factual errors, (3) score out of 10 using this rubric: excellent structure + rich data + relevant = 6.5-7.5; good structure but missing value additions = 4.5-6; average or beating around the bush = 3-4; irrelevant or factually wrong = 1-2.5.\nIf the image is unreadable or not an answer sheet, reply only: \"Image unclear. Please send a clear, well-lit photo of your answer.\"\n\nReply in plain text only, under 1500 characters, with no markdown and without the characters < > &. Use exactly this format:\nScore: X/10\nWhy marks were cut: (max 2 lines)\nWhat you did well: (2 short points)\nImprove: (3 short actionable points)\nValue additions: (2-3 keywords, reports, or data points)",
+        "inputType": "base64",
+        "options": {
+          "detail": "high",
+          "maxTokens": 700
+        }
+      },
+      "id": "74839361-51d7-4e6f-9eb1-e4f11b21872c",
+      "name": "Evaluate Answer Sheet",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Student Sends Answer Sheet').item.json.message.chat.id }}",
+        "text": "={{ String((() => { const j = Array.isArray($json) ? $json[0] : $json; const c = j && j.content; return (Array.isArray(c) ? c.map(x => x.text || \"\").join(\"\\n\") : c) || (j && j.text) || \"\"; })() || \"Evaluation failed. Please resend your answer photo.\").replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").slice(0, 3800) }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "8a6d79f7-82eb-4666-8088-db1803165801",
+      "name": "Send Feedback to Student",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Please send ONE photo of your handwritten answer, and write the exam question in the photo caption. Text-only messages, files, or photos without a caption cannot be evaluated.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "55076c02-9742-4259-83c5-ffb93b29a23a",
+      "name": "Send Upload Instructions",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        192
+      ]
+    }
+  ],
+  "connections": {
+    "Student Sends Answer Sheet": {
+      "main": [
+        [
+          {
+            "node": "Photo And Question Present?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Photo And Question Present?": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Answer Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Upload Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Answer Sheet": {
+      "main": [
+        [
+          {
+            "node": "Send Feedback to Student",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}
